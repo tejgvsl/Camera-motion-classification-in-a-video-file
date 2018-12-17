@@ -6,16 +6,27 @@ import cnnm
 import time
 import os
 
-vdir = "data/"
+vdir = "../DataSet/"
 optical_flow_dir = vdir+"optical-flow/"
 res_dir = vdir+"resized/"
 
-trainlist = "trainlist01.txt"
+train_list_dir = "../DataSet/ucfTrainTestlist/"
+
+trainlist = train_list_dir + "trainlist01.txt"
+
+#Download vgg19.npy from https://github.com/tensorlayer/pretrained-models/blob/master/models/vgg19.npy
+vgg_pretrained_path = "../DataSet/"
+
+
+# number of steps to train
+num_steps = 10 # VK: I changed it to 10 from 100000
+
 if not os.path.isfile(trainlist):
     print("Training set description not found!")
     exit()
 trainlist = open(trainlist, "r").readlines()
 training_set_length = len(trainlist)
+print("train_set_length is ", training_set_length) #9537
 training_set_offset = 0
 
 def get_video(file, color=True):
@@ -43,17 +54,23 @@ def get_video(file, color=True):
 
 def get_data(L):
     global training_set_offset, training_set_length
-
+    print("train_list size is ", len(trainlist)) # 9537
     file, label = trainlist[training_set_offset].split()
+    folder, file = file.split("/")
+    print(file)
+    print(label)
 
     # if the file listed in training set doesn't exist, remove it from training set and continue on to next one
     # mostly irrelevant for full-blown training but helpful for training on small subset of training set
     while not (os.path.isfile(res_dir+file) and os.path.isfile(optical_flow_dir+file)):
+        #print("This file does not exisit, removing from training list: ", file)
         del trainlist[training_set_offset]
         training_set_length = training_set_length - 1
         if training_set_offset >=- training_set_length:
             training_set_offset = 0
+        #print("accessing training offset ", training_set_offset)
         file, label = trainlist[training_set_offset].split()
+        folder, file = file.split("/")
 
     training_set_offset += 1
     if training_set_offset >= training_set_length :
@@ -74,7 +91,9 @@ def get_data(L):
     stacked_motion_frames = np.lib.stride_tricks.as_strided(motion_frames, (num_motion_frames-L+1, L, 224, 224),
                                         (sizeof_int32*224*224, sizeof_int32*224*224, sizeof_int32*224, sizeof_int32))
     stacked_motion_frames = np.reshape(stacked_motion_frames, (num_motion_frames-L+1, 224, 224, L))
-
+    #print(spatial_frames.shape)
+    #print(stacked_motion_frames.shape)
+    #print(label.shape)
     return spatial_frames, stacked_motion_frames, label
 
 def initialize_fc(name, shape, mean=0.0, dev=1e-3, scope=None):
@@ -108,8 +127,6 @@ lr_proximal_gradient = 0.001
 lr_gradient = 0.001
 # lmbd1, lmbd2 : l1, l2 norm reg. constants for proximal gradient respectively
 lmbd1 = lmbd2 = 1e-5
-# number of steps to train
-num_steps = 100000
 
 # create and train the model
 with tf.Session() as sess:
@@ -126,15 +143,15 @@ with tf.Session() as sess:
     print('*************************************************************************************')
     print('*************************************************************************************')
     print('*************************************************************************************')
-    vgg = vgg19.Vgg19("vgg19.npy")
+    vgg = vgg19.Vgg19(vgg_pretrained_path + "vgg19.npy")
     print('VGG model loaded')
     vgg.build(spatial_video)
     print('VGG model build done')
     vgg_fc = tf.reshape(vgg.relu6, [1, num_spatial_frames, 4096])
     print('VGG model reshape')
-    
+
     # build spatial LSTM network
-    '''with tf.variable_scope("spatial_lstm"):
+    with tf.variable_scope("spatial_lstm"):
         lstm_stack = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicLSTMCell(1024, state_is_tuple=True),
                                                   tf.contrib.rnn.BasicLSTMCell(512, state_is_tuple=True)], state_is_tuple=True)
         spatial_lstm = tf.nn.dynamic_rnn(lstm_stack, vgg_fc, dtype=tf.float32, time_major=False)
@@ -159,8 +176,8 @@ with tf.Session() as sess:
 
     # aggregate frame level CNN outputs to get video level CNN features
     with tf.variable_scope("regularized_fusion_network"):
-        spatial_video_level_features = tf.reduce_mean(vgg.relu6, axis=0, keep_dims=True)
-        motion_video_level_features = tf.reduce_mean(cnnm2048.relu1, axis=0, keep_dims=True)
+        spatial_video_level_features = tf.reduce_mean(vgg.relu6, axis=0, keepdims=True)
+        motion_video_level_features = tf.reduce_mean(cnnm2048.relu1, axis=0, keepdims=True)
 
     fc_spatial = fc_layer("fc_spatial", spatial_video_level_features, (4096, 200), "relu", 0.0, 0.001)
     fc_motion = fc_layer("fc_motion", motion_video_level_features, (4096, 200), "relu", 0.0, 0.001)
@@ -219,6 +236,11 @@ with tf.Session() as sess:
         feed_dict[spatial_video] = spatial_frames
         feed_dict[stacked_flow] = stacked_motion_frames
         feed_dict[labels] = np.array([label])
+        #print(feed_dict[spatial_video].shape)
+        #print(feed_dict[spatial_video].dtype)
+        #print(feed_dict[stacked_flow].shape)
+        #print(feed_dict[stacked_flow].dtype)
+        #print(feed_dict[labels].shape)
+        #print(feed_dict[labels].dtype)
         _, _, l = sess.run([gd_opt, pgd_opt, loss], feed_dict=feed_dict)
         print(l)
-'''
