@@ -2,6 +2,32 @@
 
 Original paper: arXiv:1504.01561
 
+Project Structure
+|
+|----->DataSet
+        |
+        |-----> optical-flow
+        |           |
+        |           |--------> v_Apply...(some hundreds of avi files)
+        |-----> resiged
+        |           |--------> v_Apply...(some hundreds of avi files)
+        |-----> UCF-101
+        |           |--------> Class name folder.. (eg. Apply...)
+        |           |                   |---------> v_Classname avi files
+        |           |--------> Another class name folder (eg. Archery)
+        |           |                   |---------> avi files (hundreds of avi example)
+        |-----> UCF101_Action_detection_splits
+        |           |--------> classInd.txt
+        |           |--------> trainlist01.txt (and some more text files)
+        |-----> ucfTrainTestlist
+        |           |--------> classInd.txt
+        |           |--------> trainlist01.txt (and some more text files)
+        |-----> vgg19.npy (Download instruction in model.py)
+|------>Video_Action_Classificiation
+        |-----> All files as it is.
+
+
+
 This is a Tensorflow implementation of the paper "Modeling Spatial-Temporal Clues in a Hybrid Deep
 Learning Framework for Video Classification"
 
@@ -10,7 +36,7 @@ Learning Framework for Video Classification"
 * **cnnm.py** : Cnn-M architecture implementation
 * **vgg.py** : Vgg19 architecture implementation
 
-As a modification to the original paper, instead of creating prediction scores with Spatial CNN, Motion CNN and Regularized Fusion Network seperately and combining them, I concatenated them into one feature vector and trained using only one softmax layer. This is a mathematical generalization of the originally proposed method, so with enough data and time, it should perform at least as good as the original model. 
+As a modification to the original paper, instead of creating prediction scores with Spatial CNN, Motion CNN and Regularized Fusion Network seperately and combining them, I concatenated them into one feature vector and trained using only one softmax layer. This is a mathematical generalization of the originally proposed method, so with enough data and time, it should perform at least as good as the original model.
 
 If you want the original model, youy can simply create three softmax layers and linearly combine their prediction scores (weights selected either through backprop or hand selected using cross-validation) for the final prediction.
 
