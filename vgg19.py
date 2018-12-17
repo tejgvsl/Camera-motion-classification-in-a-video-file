@@ -10,7 +10,7 @@ class Vgg19:
     A trainable version VGG19.
     """
 
-    def __init__(self, vgg19_npy_path=None, trainable=True, dropout=0.5):        
+    def __init__(self, vgg19_npy_path=None, trainable=True, dropout=0.5):
         if vgg19_npy_path is not None:
             self.data_dict = np.load(vgg19_npy_path)[()]
         else:
@@ -84,7 +84,7 @@ class Vgg19:
         self.fc8 = self.fc_layer(self.relu7, 4096, 1000, "fc8")
 
         self.prob = tf.nn.softmax(self.fc8, name="prob")
-        
+
         self.data_dict = None
 
     def avg_pool(self, bottom, name):
@@ -139,7 +139,7 @@ class Vgg19:
 
         return var
 
-    def print(self):
+    def print_layer(self):
         for layer in self.layers:
             print(layer)
 

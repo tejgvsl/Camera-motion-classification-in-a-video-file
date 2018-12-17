@@ -105,7 +105,7 @@ class CnnM:
 
         return var
 
-    def print(self):
+    def print_layer(self):
         for layer in self.layers:
             print(layer)
 

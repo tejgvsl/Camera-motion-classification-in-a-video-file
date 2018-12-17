@@ -6,7 +6,7 @@ import random
 
 bound = 10
 
-vdir = "UCF-101"
+vdir = "../DataSet/UCF-101"
 optical_flow_dir = "optical-flow"
 res_dir = "resized"
 
