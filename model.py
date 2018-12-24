@@ -18,8 +18,9 @@ trainlist = train_list_dir + "trainlist01.txt"
 vgg_pretrained_path = "../DataSet/"
 
 
-# number of steps to train
-num_steps = 10 # VK: I changed it to 10 from 100000
+# Make it number of video files
+num_steps = 10
+NR_EPOCHS = 1
 
 if not os.path.isfile(trainlist):
     print("Training set description not found!")
@@ -57,18 +58,14 @@ def get_data(L):
     print("train_list size is ", len(trainlist)) # 9537
     file, label = trainlist[training_set_offset].split()
     folder, file = file.split("/")
-    print(file)
-    print(label)
 
     # if the file listed in training set doesn't exist, remove it from training set and continue on to next one
     # mostly irrelevant for full-blown training but helpful for training on small subset of training set
     while not (os.path.isfile(res_dir+file) and os.path.isfile(optical_flow_dir+file)):
-        #print("This file does not exisit, removing from training list: ", file)
         del trainlist[training_set_offset]
         training_set_length = training_set_length - 1
         if training_set_offset >=- training_set_length:
             training_set_offset = 0
-        #print("accessing training offset ", training_set_offset)
         file, label = trainlist[training_set_offset].split()
         folder, file = file.split("/")
 
@@ -91,10 +88,7 @@ def get_data(L):
     stacked_motion_frames = np.lib.stride_tricks.as_strided(motion_frames, (num_motion_frames-L+1, L, 224, 224),
                                         (sizeof_int32*224*224, sizeof_int32*224*224, sizeof_int32*224, sizeof_int32))
     stacked_motion_frames = np.reshape(stacked_motion_frames, (num_motion_frames-L+1, 224, 224, L))
-    #print(spatial_frames.shape)
-    #print(stacked_motion_frames.shape)
-    #print(label.shape)
-    return spatial_frames, stacked_motion_frames, label
+    return spatial_frames, stacked_motion_frames, label, file
 
 def initialize_fc(name, shape, mean=0.0, dev=1e-3, scope=None):
     assert len(shape) == 2
@@ -118,6 +112,8 @@ def fc_layer(name, prev, shape, gate="relu", mean=0.0, dev=1e-3):
 
         return output
 
+# nr_frames : number of frames to consider at once (from on video) for training
+nr_frames = 15
 # L : height of stacked optical flows as input to temporal learning CNNs
 L = 10
 # C : number of classes
@@ -139,11 +135,8 @@ with tf.Session() as sess:
 
     # build VGG19
     print('*************************************************************************************')
-    print('*************************************************************************************')
-    print('*************************************************************************************')
-    print('*************************************************************************************')
-    print('*************************************************************************************')
-    vgg = vgg19.Vgg19(vgg_pretrained_path + "vgg19.npy")
+    #vgg = vgg19.Vgg19(vgg_pretrained_path + "vgg19.npy")
+    vgg = vgg19.Vgg19()
     print('VGG model loaded')
     vgg.build(spatial_video)
     print('VGG model build done')
@@ -230,17 +223,32 @@ with tf.Session() as sess:
     sess.run(tf.global_variables_initializer(), feed_dict=feed_dict)
 
     feed_dict[spatial_video] = feed_dict[stacked_flow] = feed_dict[labels] = None
-
-    for i in range(num_steps):
-        spatial_frames, stacked_motion_frames, label = get_data(L)
-        feed_dict[spatial_video] = spatial_frames
-        feed_dict[stacked_flow] = stacked_motion_frames
-        feed_dict[labels] = np.array([label])
-        #print(feed_dict[spatial_video].shape)
-        #print(feed_dict[spatial_video].dtype)
-        #print(feed_dict[stacked_flow].shape)
-        #print(feed_dict[stacked_flow].dtype)
-        #print(feed_dict[labels].shape)
-        #print(feed_dict[labels].dtype)
-        _, _, l = sess.run([gd_opt, pgd_opt, loss], feed_dict=feed_dict)
-        print(l)
+    logs_path = os.path.join(os.getcwd(), 'tf_log')
+    if not os.path.isdir(logs_path):
+        os.mkdir(logs_path)
+    writer = tf.summary.FileWriter(logs_path)
+    saver = tf.train.Saver()
+    writer.add_graph(sess.graph)
+    for nr_epochs in range(0, NR_EPOCHS):
+        print("starting epoch : " + str(nr_epochs))
+        for i in range(num_steps):
+            spatial_frames, stacked_motion_frames, label, file_name = get_data(L)
+            print("Training for ", file_name)
+            nr_spatial_frames = spatial_frames.shape[0]
+            nr_flow_frames = stacked_motion_frames.shape[0]
+            print("Total spatial frames: ", nr_spatial_frames)
+            print("Total optical frames: ", nr_flow_frames)
+            for j in range(0, int(nr_spatial_frames/nr_frames)+1):
+                spatial_min_range = j*nr_frames
+                spatial_max_range = min((j+1)*nr_frames, nr_spatial_frames-1)
+                optical_min_range = j*nr_frames*2
+                optical_max_range = min((j+1)*nr_frames*2, nr_flow_frames-1)
+                print("Spatial frame range: [" + str(spatial_min_range) + " , " + str(spatial_max_range) + "]")
+                print("Optical frame range: [" + str(optical_min_range) + " , " + str(optical_max_range) + "]")
+                feed_dict[spatial_video] = spatial_frames[spatial_min_range:spatial_max_range]
+                feed_dict[stacked_flow] = stacked_motion_frames[optical_min_range:optical_max_range]
+                feed_dict[labels] = np.array([label])
+                _, _, l = sess.run([gd_opt, pgd_opt, loss], feed_dict=feed_dict)
+                print("Loss: ", str(l))
+            chk_name = os.path.join(logs_path, 'model.ckpt')
+            save_path = saver.save(sess, chk_name)
