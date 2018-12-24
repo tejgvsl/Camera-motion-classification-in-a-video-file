@@ -12,22 +12,20 @@ res_dir = vdir+"resized/"
 
 train_list_dir = "../DataSet/ucfTrainTestlist/"
 
-trainlist = train_list_dir + "trainlist01.txt"
+trainlist = train_list_dir + "trainlist01.txt" 
 
 #Download vgg19.npy from https://github.com/tensorlayer/pretrained-models/blob/master/models/vgg19.npy
 vgg_pretrained_path = "../DataSet/"
 
-
-# Make it number of video files
-num_steps = 10
-NR_EPOCHS = 1
+num_video_files = 10       # Assign it with 'The total number of videos you want to train the model with  
+NR_EPOCHS = 1              # Assign it with 'The number of times you want to train the model with all videos
 
 if not os.path.isfile(trainlist):
     print("Training set description not found!")
     exit()
 trainlist = open(trainlist, "r").readlines()
 training_set_length = len(trainlist)
-print("train_set_length is ", training_set_length) #9537
+print("train_set_length is ", training_set_length)
 training_set_offset = 0
 
 def get_video(file, color=True):
@@ -40,7 +38,7 @@ def get_video(file, color=True):
         frames = np.zeros((num_frames, 224, 224))
 
     # load video into numpy array in the following format:
-    # ar = [num_frames, 224, 224, 3]
+    # [num_frames, 224, 224, 3]
     k=0
     while cap.isOpened():
         ret, frame = cap.read()
@@ -55,9 +53,10 @@ def get_video(file, color=True):
 
 def get_data(L):
     global training_set_offset, training_set_length
-    print("train_list size is ", len(trainlist)) # 9537
-    file, label = trainlist[training_set_offset].split()
-    folder, file = file.split("/")
+    print("train_list size is ", len(trainlist))
+    # Pass the respective separator to split(), with which the Video file and class are separated in "trainlist01.txt"
+    file, label = trainlist[training_set_offset].split("#")  
+    #folder, file = file.split("/")
 
     # if the file listed in training set doesn't exist, remove it from training set and continue on to next one
     # mostly irrelevant for full-blown training but helpful for training on small subset of training set
@@ -66,8 +65,8 @@ def get_data(L):
         training_set_length = training_set_length - 1
         if training_set_offset >=- training_set_length:
             training_set_offset = 0
-        file, label = trainlist[training_set_offset].split()
-        folder, file = file.split("/")
+        file, label = trainlist[training_set_offset].split("#")
+        #folder, file = file.split("/")
 
     training_set_offset += 1
     if training_set_offset >= training_set_length :
@@ -112,12 +111,13 @@ def fc_layer(name, prev, shape, gate="relu", mean=0.0, dev=1e-3):
 
         return output
 
-# nr_frames : number of frames to consider at once (from on video) for training
+# nr_frames : number of frames to consider at once from one video file for training
+# can be increased to 50 or 100 based on the memory resource availability
 nr_frames = 15
 # L : height of stacked optical flows as input to temporal learning CNNs
 L = 10
 # C : number of classes
-C = 101
+C = 5
 # learning rates for optimizers
 lr_proximal_gradient = 0.001
 lr_gradient = 0.001
@@ -231,7 +231,7 @@ with tf.Session() as sess:
     writer.add_graph(sess.graph)
     for nr_epochs in range(0, NR_EPOCHS):
         print("starting epoch : " + str(nr_epochs))
-        for i in range(num_steps):
+        for i in range(num_video_files):
             spatial_frames, stacked_motion_frames, label, file_name = get_data(L)
             print("Training for ", file_name)
             nr_spatial_frames = spatial_frames.shape[0]
