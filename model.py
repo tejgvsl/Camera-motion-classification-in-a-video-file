@@ -19,6 +19,7 @@ vgg_pretrained_path = "../DataSet/"
 
 num_video_files = 10       # Assign it with 'The total number of videos you want to train the model with  
 NR_EPOCHS = 1              # Assign it with 'The number of times you want to train the model with all videos
+to_train = True            # Decides whether the model need to be trained with current video or not
 
 if not os.path.isfile(trainlist):
     print("Training set description not found!")
@@ -77,6 +78,12 @@ def get_data(L):
 
     # read optical flow video
     num_motion_frames, motion_frames = get_video(optical_flow_dir+file, color=False)
+    
+    if(num_motion_frames >= L) :
+        to_train = True
+    else :
+        num_motion_frames = L + 1
+        to_train = False
 
     # stack optical flow frames efficiently using numpy's stride_tricks method
     sizeof_int32 = np.dtype(np.int32).itemsize
@@ -233,6 +240,9 @@ with tf.Session() as sess:
         print("starting epoch : " + str(nr_epochs))
         for i in range(num_video_files):
             spatial_frames, stacked_motion_frames, label, file_name = get_data(L)
+            if(to_train == false) :
+                print("Training skipped: as it is a very short duration Video file")
+                continue
             print("Training for ", file_name)
             nr_spatial_frames = spatial_frames.shape[0]
             nr_flow_frames = stacked_motion_frames.shape[0]
