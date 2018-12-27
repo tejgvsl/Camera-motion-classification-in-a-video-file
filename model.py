@@ -53,7 +53,7 @@ def get_video(file, color=True):
     return num_frames, frames
 
 def get_data(L):
-    global training_set_offset, training_set_length
+    global training_set_offset, training_set_length, to_train
     print("train_list size is ", len(trainlist))
     # Pass the respective separator to split(), with which the Video file and class are separated in "trainlist01.txt"
     file, label = trainlist[training_set_offset].split("#")  
@@ -82,7 +82,7 @@ def get_data(L):
     if(num_motion_frames >= L) :
         to_train = True
     else :
-        num_motion_frames = L + 1
+        num_motion_frames = L
         to_train = False
 
     # stack optical flow frames efficiently using numpy's stride_tricks method
